@@ -45,7 +45,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initValue() {
-        String[] paths = new String[] { DATA_PATH, DATA_PATH + "tessdata/" };
+        String[] paths = new String[]{DATA_PATH, DATA_PATH + "tessdata/"};
         for (String path : paths) {
             File dir = new File(path);
             if (!dir.exists()) {
@@ -97,6 +97,18 @@ public class MainActivity extends AppCompatActivity {
 
         binding.btnScan.setOnClickListener(view -> {
             binding.tvResult.setText("");
+
+           /* TextRecognizer textRecognizer = new TextRecognizer.Builder(this).build();
+            textRecognizer.setProcessor(new TextProcessor());
+            if (!textRecognizer.isOperational()) {
+                new AlertDialog.Builder(this)
+                        .setMessage("Text recognizer could not be set up on your device :(").show();
+                return;
+            }
+            Frame frame = new Frame.Builder().setBitmap(yourSelectedImage).build();
+            textRecognizer.detect(frame);*/
+            //SparseArray<TextBlock> sparseArray = textRecognizer.detect(frame);
+
             new AsyncTask() {
 
                 @Override
@@ -108,17 +120,24 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 protected Object doInBackground(Object[] objects) {
+                    int perW = yourSelectedImage.getWidth() / 3;
+                    int perH = yourSelectedImage.getHeight() / 3;
+                    Bitmap bitmapHolder = Bitmap.createBitmap(yourSelectedImage, perW, 0, yourSelectedImage.getWidth() - perW, yourSelectedImage.getHeight());
+                    Bitmap blockOne = bitmapHolder.createBitmap(bitmapHolder, 0, bitmapHolder.getHeight() / 3, bitmapHolder.getWidth(), bitmapHolder.getHeight() / 3);
+                    Bitmap id = Bitmap.createBitmap(bitmapHolder, 0, blockOne.getHeight() - (blockOne.getHeight() / 4), blockOne.getWidth(), blockOne.getHeight() / 4);
+                    String myText = "";
+
 
                     TessBaseAPI baseApi = new TessBaseAPI();
                     // DATA_PATH = Path to the storage
                     // lang = for which the language data exists, usually "eng"
                     baseApi.init(DATA_PATH, lang);
                     // Eg. baseApi.init("/mnt/sdcard/tesseract/tessdata/eng.traineddata", "eng");
-                    baseApi.setImage(yourSelectedImage);
-                    String recognizedText = baseApi.getUTF8Text();
+                    baseApi.setImage(id);
+                    myText = baseApi.getUTF8Text();
                     baseApi.end();
 
-                    return recognizedText;
+                    return myText;
                 }
 
                 @Override
@@ -148,4 +167,5 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+   
 }
