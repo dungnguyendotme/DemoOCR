@@ -16,6 +16,9 @@ import android.widget.Toast;
 
 import com.googlecode.tesseract.android.TessBaseAPI;
 
+import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Mat;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -28,18 +31,24 @@ import me.dungnguyen.demoocr.databinding.ActivityMainBinding;
 public class MainActivity extends AppCompatActivity {
     public static String TAG = "MainActivity";
     ActivityMainBinding binding;
-
     private int PICK_IMAGE = 1221;
     public static final String DATA_PATH = Environment
             .getExternalStorageDirectory().toString() + "/DemoOCR/";
     private String lang = "vie";
     private Bitmap yourSelectedImage;
 
+    static {
+        if (!OpenCVLoader.initDebug()) {
+            Log.e(TAG, "open cv not loaded");
+        } else {
+            Log.e(TAG, "open cv loaded");
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main);
-
         initValue();
         initEvent();
     }
@@ -98,15 +107,7 @@ public class MainActivity extends AppCompatActivity {
         binding.btnScan.setOnClickListener(view -> {
             binding.tvResult.setText("");
 
-           /* TextRecognizer textRecognizer = new TextRecognizer.Builder(this).build();
-            textRecognizer.setProcessor(new TextProcessor());
-            if (!textRecognizer.isOperational()) {
-                new AlertDialog.Builder(this)
-                        .setMessage("Text recognizer could not be set up on your device :(").show();
-                return;
-            }
-            Frame frame = new Frame.Builder().setBitmap(yourSelectedImage).build();
-            textRecognizer.detect(frame);*/
+
             //SparseArray<TextBlock> sparseArray = textRecognizer.detect(frame);
 
             new AsyncTask() {
@@ -115,7 +116,6 @@ public class MainActivity extends AppCompatActivity {
                 protected void onPreExecute() {
                     super.onPreExecute();
                     binding.progress.setVisibility(View.VISIBLE);
-
                 }
 
                 @Override
@@ -167,5 +167,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-   
+    private void detectTextZone(Bitmap bitmap) {
+        Mat lagre = new Mat();
+        
+
+    }
 }
