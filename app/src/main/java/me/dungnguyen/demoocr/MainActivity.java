@@ -5,19 +5,29 @@ import android.content.res.AssetManager;
 import android.databinding.DataBindingUtil;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
-import android.view.View;
 import android.widget.Toast;
 
 import com.googlecode.tesseract.android.TessBaseAPI;
 
 import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
+import org.opencv.core.Rect;
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -25,6 +35,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 import me.dungnguyen.demoocr.databinding.ActivityMainBinding;
 
@@ -36,6 +48,13 @@ public class MainActivity extends AppCompatActivity {
             .getExternalStorageDirectory().toString() + "/DemoOCR/";
     private String lang = "vie";
     private Bitmap yourSelectedImage;
+
+    static {
+        System.loadLibrary("jpgt");
+        System.loadLibrary("pngt");
+        System.loadLibrary("lept");
+        System.loadLibrary("tess");
+    }
 
     static {
         if (!OpenCVLoader.initDebug()) {
@@ -65,7 +84,6 @@ public class MainActivity extends AppCompatActivity {
                     Log.v(TAG, "Created directory " + path + " on sdcard");
                 }
             }
-
         }
 
         if (!(new File(DATA_PATH + "tessdata/" + lang + ".traineddata")).exists()) {
@@ -106,11 +124,30 @@ public class MainActivity extends AppCompatActivity {
 
         binding.btnScan.setOnClickListener(view -> {
             binding.tvResult.setText("");
-
-
             //SparseArray<TextBlock> sparseArray = textRecognizer.detect(frame);
+            String myText = "";
+            TessBaseAPI baseApi = new TessBaseAPI();
+            baseApi.init(DATA_PATH, lang);
+            ArrayList<Rect> rectArrayList = detectTextZone(yourSelectedImage);
+            Bitmap workingBitmap = Bitmap.createBitmap(yourSelectedImage);
+            Bitmap mutableBitmap = workingBitmap.copy(Bitmap.Config.ARGB_8888, true);
+            Canvas canvas = new Canvas(mutableBitmap);
+            Paint paint = new Paint();
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setColor(Color.BLUE);
+            paint.setStrokeWidth(5.0f);
+            for (int i = 0; i < rectArrayList.size(); i++) {
+                Rect itemRect = rectArrayList.get(i);
+               /* if(i == 30){
+                    Bitmap bitmap = Bitmap.createBitmap(yourSelectedImage, itemRect.x, itemRect.y, itemRect.width, itemRect.height);
+                    binding.imageChanged.setImageBitmap(bitmap);
+                }*/
+                canvas.drawRect(itemRect.x, itemRect.y, itemRect.width, itemRect.height, paint);
+            }
+            binding.imvPhoto.setImageBitmap(mutableBitmap);
 
-            new AsyncTask() {
+            baseApi.end();
+           /* new AsyncTask() {
 
                 @Override
                 protected void onPreExecute() {
@@ -120,21 +157,29 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 protected Object doInBackground(Object[] objects) {
-                    int perW = yourSelectedImage.getWidth() / 3;
-                    int perH = yourSelectedImage.getHeight() / 3;
-                    Bitmap bitmapHolder = Bitmap.createBitmap(yourSelectedImage, perW, 0, yourSelectedImage.getWidth() - perW, yourSelectedImage.getHeight());
-                    Bitmap blockOne = bitmapHolder.createBitmap(bitmapHolder, 0, bitmapHolder.getHeight() / 3, bitmapHolder.getWidth(), bitmapHolder.getHeight() / 3);
-                    Bitmap id = Bitmap.createBitmap(bitmapHolder, 0, blockOne.getHeight() - (blockOne.getHeight() / 4), blockOne.getWidth(), blockOne.getHeight() / 4);
                     String myText = "";
-
-
                     TessBaseAPI baseApi = new TessBaseAPI();
+                    baseApi.init(DATA_PATH, lang);
+                    ArrayList<Rect> rectArrayList = detectTextZone(yourSelectedImage);
+                    Canvas canvas = new Canvas(yourSelectedImage);
+                    Paint paint = new Paint();
+                    paint.setColor(Color.BLUE);
+                    paint.setStrokeWidth(2.0f);
+                    for (int i = 0; i < rectArrayList.size(); i++) {
+                        Rect itemRect = rectArrayList.get(i);
+                        canvas.drawRect(itemRect.x, itemRect.y, itemRect.width, itemRect.height, paint);
+                        *//*Bitmap itemBitmap = Bitmap.createBitmap(yourSelectedImage, itemRect.x, itemRect.y, itemRect.width, itemRect.height);
+                        baseApi.setImage(itemBitmap);
+
+                        binding.imvPhoto.draw(new Canvas());
+                        myText = myText + " " + baseApi.getUTF8Text();
+                        Log.e(TAG, "text : " + myText);*//*
+                    }
+                    binding.imvPhoto.draw(canvas);
                     // DATA_PATH = Path to the storage
                     // lang = for which the language data exists, usually "eng"
-                    baseApi.init(DATA_PATH, lang);
                     // Eg. baseApi.init("/mnt/sdcard/tesseract/tessdata/eng.traineddata", "eng");
-                    baseApi.setImage(id);
-                    myText = baseApi.getUTF8Text();
+
                     baseApi.end();
 
                     return myText;
@@ -147,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
                     binding.tvResult.setText(String.valueOf(o));
 
                 }
-            }.execute();
+            }.execute();*/
         });
     }
 
@@ -167,9 +212,46 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void detectTextZone(Bitmap bitmap) {
-        Mat lagre = new Mat();
-        
+    private ArrayList<Rect> detectTextZone(Bitmap bitmap) {
+        Mat large = new Mat();
 
+        Mat rgb = new Mat();
+        Bitmap bmp = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+
+        Utils.bitmapToMat(bmp, large);
+
+        ArrayList<Rect> rectArrayList = new ArrayList<>();
+        Mat img_gray = new Mat(), img_sobel = new Mat(), img_threshold = new Mat(), element = new Mat();
+        Imgproc.cvtColor(large, img_gray, Imgproc.COLOR_RGB2GRAY);
+        Imgproc.Sobel(img_gray, img_sobel, CvType.CV_8U, 1, 0, 3, 1, 0, Core.BORDER_DEFAULT);
+        //at src, Mat dst, double thresh, double maxval, int type
+        Imgproc.threshold(img_sobel, img_threshold, 0, 255, 8);
+        element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9, 1));
+        Imgproc.morphologyEx(img_threshold, img_threshold, Imgproc.MORPH_CLOSE, element);
+        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
+        Mat hierarchy = new Mat();
+        Imgproc.findContours(img_threshold, contours, hierarchy, 0, 1);
+
+        List<MatOfPoint> contours_poly = new ArrayList<MatOfPoint>(contours.size());
+
+        for (int i = 0; i < contours.size(); i++) {
+
+            MatOfPoint2f mMOP2f1 = new MatOfPoint2f();
+            MatOfPoint2f mMOP2f2 = new MatOfPoint2f();
+
+            contours.get(i).convertTo(mMOP2f1, CvType.CV_32FC2);
+            Imgproc.approxPolyDP(mMOP2f1, mMOP2f2, 3, true);
+            mMOP2f2.convertTo(contours.get(i), CvType.CV_32S);
+
+
+            Rect appRect = Imgproc.boundingRect(contours.get(i));
+            if (appRect.width > appRect.height && !rectArrayList.contains(appRect)) {
+                rectArrayList.add(appRect);
+            }
+
+        }
+        return rectArrayList;
     }
 }
+
+

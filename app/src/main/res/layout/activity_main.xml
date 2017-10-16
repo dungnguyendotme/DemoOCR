@@ -25,12 +25,19 @@
                 android:layout_below="@+id/btnPickPhoto"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="10dp" />
+            <ImageView
+                android:id="@+id/image_changed"
+                android:layout_width="300dp"
+                android:layout_height="300dp"
+                android:layout_below="@+id/imvPhoto"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="10dp" />
 
             <Button
                 android:id="@+id/btnScan"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@+id/imvPhoto"
+                android:layout_below="@+id/image_changed"
                 android:layout_marginTop="10dp"
                 android:text="SCAN" />
 
