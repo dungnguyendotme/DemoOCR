@@ -143,6 +143,10 @@ public class MainActivity extends AppCompatActivity {
             paint.setStrokeWidth(5.0f);
             for (int i = 0; i < rectArrayList.size(); i++) {
                 Rect itemRect = rectArrayList.get(i);
+                Bitmap bitmap = Bitmap.createBitmap(yourSelectedImage, Math.max(0, itemRect.x - 5), Math.max(0, itemRect.y - 1), itemRect.x + itemRect.width + 1, itemRect.y + itemRect.height + 1);
+                baseApi.setImage(bitmap);
+                myText = myText + " " + baseApi.getUTF8Text();
+                Log.e(TAG, "my text : " + myText);
                /* if(i == 30){
                     Bitmap bitmap = Bitmap.createBitmap(yourSelectedImage, itemRect.x, itemRect.y, itemRect.width, itemRect.height);
                     binding.imageChanged.setImageBitmap(bitmap);
