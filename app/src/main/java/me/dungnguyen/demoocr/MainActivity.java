@@ -8,7 +8,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -25,9 +24,12 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
+import org.opencv.core.Point;
 import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.utils.Converters;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -39,6 +41,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import me.dungnguyen.demoocr.databinding.ActivityMainBinding;
+
+import static org.opencv.imgproc.Imgproc.GaussianBlur;
+import static org.opencv.imgproc.Imgproc.Sobel;
 
 public class MainActivity extends AppCompatActivity {
     public static String TAG = "MainActivity";
@@ -142,7 +147,7 @@ public class MainActivity extends AppCompatActivity {
                     Bitmap bitmap = Bitmap.createBitmap(yourSelectedImage, itemRect.x, itemRect.y, itemRect.width, itemRect.height);
                     binding.imageChanged.setImageBitmap(bitmap);
                 }*/
-                canvas.drawRect(itemRect.x, itemRect.y, itemRect.width, itemRect.height, paint);
+                canvas.drawRect(Math.max(0, itemRect.x - 5), Math.max(0, itemRect.y - 1), itemRect.x + itemRect.width + 1, itemRect.y + itemRect.height + 1, paint);
             }
             binding.imvPhoto.setImageBitmap(mutableBitmap);
 
@@ -212,46 +217,138 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private ArrayList<Rect> detectTextZone(Bitmap bitmap) {
-        Mat large = new Mat();
-
-        Mat rgb = new Mat();
-        Bitmap bmp = bitmap.copy(Bitmap.Config.ARGB_8888, true);
-
-        Utils.bitmapToMat(bmp, large);
-
-        ArrayList<Rect> rectArrayList = new ArrayList<>();
-        Mat img_gray = new Mat(), img_sobel = new Mat(), img_threshold = new Mat(), element = new Mat();
-        Imgproc.cvtColor(large, img_gray, Imgproc.COLOR_RGB2GRAY);
-        Imgproc.Sobel(img_gray, img_sobel, CvType.CV_8U, 1, 0, 3, 1, 0, Core.BORDER_DEFAULT);
-        //at src, Mat dst, double thresh, double maxval, int type
-        Imgproc.threshold(img_sobel, img_threshold, 0, 255, 8);
-        element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9, 1));
-        Imgproc.morphologyEx(img_threshold, img_threshold, Imgproc.MORPH_CLOSE, element);
-        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
-        Mat hierarchy = new Mat();
-        Imgproc.findContours(img_threshold, contours, hierarchy, 0, 1);
-
-        List<MatOfPoint> contours_poly = new ArrayList<MatOfPoint>(contours.size());
-
-        for (int i = 0; i < contours.size(); i++) {
-
-            MatOfPoint2f mMOP2f1 = new MatOfPoint2f();
-            MatOfPoint2f mMOP2f2 = new MatOfPoint2f();
-
-            contours.get(i).convertTo(mMOP2f1, CvType.CV_32FC2);
-            Imgproc.approxPolyDP(mMOP2f1, mMOP2f2, 3, true);
-            mMOP2f2.convertTo(contours.get(i), CvType.CV_32S);
-
-
-            Rect appRect = Imgproc.boundingRect(contours.get(i));
-            if (appRect.width > appRect.height && !rectArrayList.contains(appRect)) {
-                rectArrayList.add(appRect);
+    /* private ArrayList<Rect> detectTextZone(Bitmap bitmap) {
+         ArrayList<Rect> rectArrayList = new ArrayList<>();
+         Mat large = new Mat();
+         Bitmap bmp = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+         Utils.bitmapToMat(bmp, large);
+         Mat rgb = new Mat();
+         Imgproc.pyrDown(large, rgb);
+         Mat small = new Mat();
+         Imgproc.cvtColor(large, small, Imgproc.COLOR_BGR2GRAY);
+         Mat grad = new Mat();
+         Mat morphKernel = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(3, 3));
+         Imgproc.morphologyEx(small, grad, Imgproc.MORPH_GRADIENT, morphKernel);
+         // binarize
+         //Mat bw = new Mat();
+         //Imgproc.threshold(grad, bw, 80, 255.0, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
+         // connect horizontally oriented regions
+         Mat connected = new Mat();
+         morphKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9, 1));
+         Imgproc.morphologyEx(grad, connected, Imgproc.MORPH_CLOSE, morphKernel);
+         //
+         Mat mask = Mat.zeros(grad.size(), CvType.CV_8UC1);
+         ArrayList<MatOfPoint> contours = new ArrayList<>();
+         Imgproc.findContours(connected, contours, new Mat(), Imgproc.RETR_CCOMP, Imgproc.CHAIN_APPROX_SIMPLE, new Point(0, 0));
+         for (int i = 0; i < contours.size(); i++) {
+             Rect rect = Imgproc.boundingRect(contours.get(i));
+             Mat maskROI = new Mat(mask, rect);
+             maskROI.setTo(new Scalar(0, 0, 0));
+             Imgproc.drawContours(mask, contours, i, new Scalar(255, 255, 255), Core.FILLED);
+             double r = (double) Core.countNonZero(maskROI) / (rect.width * rect.height);
+             rectArrayList.add(rect);
+             if(rect.width > rect.height){
+                rectArrayList.add(rect);
             }
-
+            if (r > .45 // assume at least 45% of the area is filled if it contains text
+                    &&
+                    (rect.height > 8 && rect.width > 8 )  //constraints on region size
+                // these two conditions alone are not very robust. better to use something
+                // like the number of significant peaks in a horizontal projection as a third condition
+                    ) {
+                rectArrayList.add(rect);
+            }
         }
         return rectArrayList;
+    }*/
+    private ArrayList<Rect> detectTextZone(Bitmap bitmap) {
+        ArrayList<Rect> rectArrayList = new ArrayList<>();
+        Mat img_gray = new Mat();
+        Mat img_sobel = new Mat();
+        Mat img_threshold = new Mat();
+        Mat element = new Mat();
+        Mat large = new Mat();
+        Bitmap bmp = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+        Utils.bitmapToMat(bmp, large);
+        Imgproc.cvtColor(large, img_gray, Imgproc.COLOR_BGR2GRAY);
+        img_gray = processNoisy(img_gray);
+        Sobel(img_gray, img_sobel, CvType.CV_8UC1, 1, 0, 3, 1, 0, Core.BORDER_DEFAULT);
+        Imgproc.threshold(img_sobel, img_threshold, 0, 255, Imgproc.THRESH_OTSU | Imgproc.THRESH_BINARY);
+        element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(85, 30));
+        Imgproc.morphologyEx(img_threshold, img_threshold, Imgproc.MORPH_CLOSE, element);
+        ArrayList<MatOfPoint> contours = new ArrayList<>();
+        Imgproc.findContours(img_threshold, contours, new Mat(), 0, 1);
+        for (int i = 0; i < contours.size(); i++) {
+            MatOfPoint2f approxCurve = new MatOfPoint2f();
+            List<Point> listPoint2f = new ArrayList<>();
+            Converters.Mat_to_vector_Point2f(contours.get(i), listPoint2f);
+            MatOfPoint2f contour2f = new MatOfPoint2f(contours.get(i).toArray());
+            Imgproc.approxPolyDP(contour2f, approxCurve, 3, true);
+            MatOfPoint tempPoint = new MatOfPoint(approxCurve.toArray());
+            Rect rect = Imgproc.boundingRect(tempPoint);
+            if (rect.width > rect.height) {
+                rectArrayList.add(rect);
+            }
+        }
+        //
+        return rectArrayList;
     }
+
+
+    private Mat processNoisy(Mat grayMat) {
+        Mat element1 = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(2, 2), new Point(1, 1));
+        Mat element2 = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(2, 2), new Point(1, 1));
+        Imgproc.dilate(grayMat, grayMat, element1);
+        Imgproc.erode(grayMat, grayMat, element2);
+
+        GaussianBlur(grayMat, grayMat, new Size(3, 3), 0);
+        // The thresold value will be used here
+        Imgproc.threshold(grayMat, grayMat, 80, 255, Imgproc.THRESH_BINARY);
+
+        return grayMat;
+    }
+
+  /* private ArrayList<Rect> detectTextZone(Bitmap bitmap) {
+       ArrayList<Rect> rectArrayList = new ArrayList<>();
+       Mat large = new Mat();
+       Bitmap bmp = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+       Utils.bitmapToMat(bmp, large);
+       Mat rgb = new Mat();
+       Imgproc.pyrDown(large, rgb);
+       Mat small = new Mat();
+       Imgproc.cvtColor(rgb, small, Imgproc.COLOR_BGR2GRAY);
+       Mat grad = new Mat();
+       Mat morphKernel = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(3, 3));
+       Imgproc.morphologyEx(small, grad, Imgproc.MORPH_GRADIENT, morphKernel);
+       // binarize
+       Mat bw = new Mat();
+       Imgproc.threshold(grad, bw, 0.0, 255.0, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
+       // connect horizontally oriented regions
+       Mat connected = new Mat();
+       morphKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(9, 1));
+       Imgproc.morphologyEx(bw, connected, Imgproc.MORPH_CLOSE, morphKernel);
+       //
+       Mat mask = Mat.zeros(bw.size(), CvType.CV_8UC1);
+       ArrayList<MatOfPoint> contours = new ArrayList<>();
+       Imgproc.findContours(connected, contours, new Mat(), Imgproc.RETR_CCOMP, Imgproc.CHAIN_APPROX_SIMPLE, new Point(0, 0));
+       for (int i = 0; i < contours.size(); i++) {
+           Rect rect = Imgproc.boundingRect(contours.get(i));
+           Mat maskROI = new Mat(mask, rect);
+           Imgproc.drawContours(mask, contours, i, new Scalar(255, 255, 255), Core.FILLED);
+           double r = (double) Core.countNonZero(maskROI) / (rect.width * rect.height);
+           if (r > .45 *//**//* assume at least 45% of the area is filled if it contains text *//**//*
+                   &&
+                   (rect.height > 8 && rect.width > 8 && (rect.width > rect.height)) *//**//* constraints on region size *//**//*
+            *//**//* these two conditions alone are not very robust. better to use something
+           like the number of significant peaks in a horizontal projection as a third condition *//**//*
+                    ) {
+               rectArrayList.add(rect);
+           }
+
+       }
+       return rectArrayList;
+   }*/
+
 }
 
 
