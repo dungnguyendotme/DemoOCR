@@ -26,7 +26,6 @@ import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
-import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.utils.Converters;
@@ -141,9 +140,13 @@ public class MainActivity extends AppCompatActivity {
             paint.setStyle(Paint.Style.STROKE);
             paint.setColor(Color.BLUE);
             paint.setStrokeWidth(5.0f);
-            for (int i = 0; i < rectArrayList.size(); i++) {
+            for (int i = rectArrayList.size() - 1; i >= 0; i--) {
                 Rect itemRect = rectArrayList.get(i);
-                Bitmap bitmap = Bitmap.createBitmap(yourSelectedImage, Math.max(0, itemRect.x - 5), Math.max(0, itemRect.y - 1), itemRect.x + itemRect.width + 1, itemRect.y + itemRect.height + 1);
+                int x = Math.max(itemRect.x - 10, 0);
+                int y = Math.max(itemRect.y - 10, 0);
+                int width = Math.min(itemRect.width + 10, yourSelectedImage.getWidth());
+                int height = Math.min(itemRect.height + 10, yourSelectedImage.getHeight());
+                Bitmap bitmap = Bitmap.createBitmap(yourSelectedImage, x, y, width, height);
                 baseApi.setImage(bitmap);
                 myText = myText + " " + baseApi.getUTF8Text();
                 Log.e(TAG, "my text : " + myText);
